@@ -2,7 +2,7 @@ services:
   - type: web
     name: achats-cuisine
     runtime: node
-    plan: starter            # un disque persistant nécessite un plan payant
+    plan: free               # ⚠️ données effacées à chaque redémarrage / mise en veille
     buildCommand: npm install
     startCommand: npm start
     envVars:
@@ -12,11 +12,12 @@ services:
         generateValue: true
       - key: ADMIN_PASSWORD   # mot de passe initial du compte "admin"
         sync: false
-      - key: DATA_DIR
-        value: /var/data
       - key: TZ
         value: Africa/Casablanca
-    disk:
-      name: data
-      mountPath: /var/data
-      sizeGB: 1
+    # Pour garder les données, passer au plan "starter" et ajouter :
+    #   - key: DATA_DIR
+    #     value: /var/data
+    # disk:
+    #   name: data
+    #   mountPath: /var/data
+    #   sizeGB: 1
