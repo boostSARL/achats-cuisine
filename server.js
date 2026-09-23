@@ -55,8 +55,43 @@ function initData() {
     save('produits', seed.map(([nom, categorie, unite, prix], i) => ({ id: i + 1, nom, categorie, unite, prix })));
   }
   if (!fs.existsSync(path.join(DATA_DIR, 'achats.json'))) save('achats', []);
+  if (!fs.existsSync(path.join(DATA_DIR, 'sorties.json'))) save('sorties', []);
 }
 initData();
+
+// ---------- Stock : achats - sorties ----------
+const MOTIFS = ['Petit-déjeuner', 'Déjeuner', 'Dîner', 'Perte / abîmé', 'Autre'];
+const EPS = 1e-6;
+
+function stockMap() {
+  const m = {};
+  const get = id => (m[id] ||= { achete: 0, sorti: 0, cout: 0 });
+  for (const a of load('achats')) for (const l of a.lignes) { const s = get(l.produit_id); s.achete += l.quantite; s.cout += l.montant; }
+  for (const x of load('sorties')) for (const l of x.lignes) get(l.produit_id).sorti += l.quantite;
+  for (const s of Object.values(m)) {
+    s.stock = round(s.achete - s.sorti, 3);
+    s.cmp = s.achete ? round(s.cout / s.achete) : 0; // coût moyen pondéré
+  }
+  return m;
+}
+
+// Vérifie qu'un changement de quantités achetées ne rend aucun stock négatif
+function stockError(delta) {
+  const stock = stockMap();
+  for (const [pid, d] of Object.entries(delta)) {
+    const s = stock[pid];
+    if (d < 0 && s && s.stock + d < -EPS) {
+      const p = load('produits').find(x => x.id === +pid);
+      return `Impossible : le stock de ${p ? p.nom : 'ce produit'} deviendrait négatif (des sorties ont déjà été faites)`;
+    }
+  }
+  return null;
+}
+
+function addQty(delta, lignes, sign) {
+  for (const l of lignes) delta[l.produit_id] = (delta[l.produit_id] || 0) + sign * l.quantite;
+  return delta;
+}
 
 // ---------- App ----------
 const app = express();
@@ -137,6 +172,7 @@ app.post('/api/produits', adminOnly, (req, res) => {
   const categorie = req.body.categorie;
   const unite = String(req.body.unite || '').trim();
   const prix = round(num(req.body.prix));
+  const stock_min = round(num(req.body.stock_min) || 0, 3);
   if (!nom) return fail(res, 'Le nom est obligatoire');
   if (!['Légume', 'Fruit'].includes(categorie)) return fail(res, 'Catégorie invalide');
   if (!unite) return fail(res, "L'unité est obligatoire");
@@ -147,9 +183,9 @@ app.post('/api/produits', adminOnly, (req, res) => {
   if (id) {
     const p = produits.find(x => x.id === id);
     if (!p) return fail(res, 'Produit introuvable', 404);
-    Object.assign(p, { nom, categorie, unite, prix });
+    Object.assign(p, { nom, categorie, unite, prix, stock_min });
   } else {
-    produits.push({ id: nextId(produits), nom, categorie, unite, prix });
+    produits.push({ id: nextId(produits), nom, categorie, unite, prix, stock_min });
   }
   save('produits', produits);
   res.json({ ok: true, message: id ? 'Produit modifié' : 'Produit ajouté' });
@@ -159,6 +195,7 @@ app.delete('/api/produits/:id', adminOnly, (req, res) => {
   const produits = load('produits');
   const rest = produits.filter(p => p.id !== +req.params.id);
   if (rest.length === produits.length) return fail(res, 'Produit introuvable', 404);
+  if ((stockMap()[req.params.id]?.stock || 0) > EPS) return fail(res, 'Ce produit a encore du stock : faites une sortie avant de le supprimer');
   save('produits', rest);
   res.json({ ok: true, message: 'Produit supprimé' });
 });
@@ -231,6 +268,10 @@ app.post('/api/achats', (req, res) => {
     lignes.push({ produit_id: pid, produit: p.nom, categorie: p.categorie, unite: p.unite, quantite, prix, montant });
   }
   if (!lignes.length) return fail(res, 'Ajoutez au moins un produit');
+  if (old) {
+    const err = stockError(addQty(addQty({}, lignes, 1), old.lignes, -1));
+    if (err) return fail(res, err);
+  }
 
   const data = { date, fournisseur, note, lignes, total: round(total) };
   if (old) {
@@ -244,10 +285,94 @@ app.post('/api/achats', (req, res) => {
 
 app.delete('/api/achats/:id', adminOnly, (req, res) => {
   const achats = load('achats');
-  const rest = achats.filter(a => a.id !== +req.params.id);
-  if (rest.length === achats.length) return fail(res, 'Achat introuvable', 404);
-  save('achats', rest);
+  const old = achats.find(a => a.id === +req.params.id);
+  if (!old) return fail(res, 'Achat introuvable', 404);
+  const err = stockError(addQty({}, old.lignes, -1));
+  if (err) return fail(res, err);
+  save('achats', achats.filter(a => a !== old));
   res.json({ ok: true, message: 'Achat supprimé' });
+});
+
+// ---------- Stock ----------
+function stockList() {
+  const m = stockMap();
+  return load('produits').map(p => {
+    const s = m[p.id] || { achete: 0, sorti: 0, stock: 0, cmp: 0 };
+    const stock_min = p.stock_min || 0;
+    return {
+      id: p.id, nom: p.nom, categorie: p.categorie, unite: p.unite, stock_min,
+      achete: round(s.achete, 3), sorti: round(s.sorti, 3), stock: s.stock,
+      cmp: s.cmp || p.prix, valeur: round(Math.max(s.stock, 0) * (s.cmp || p.prix)),
+      alerte: stock_min > 0 && s.stock <= stock_min,
+    };
+  }).sort((a, b) => b.categorie.localeCompare(a.categorie) || a.nom.localeCompare(b.nom, 'fr'));
+}
+
+app.get('/api/stock', (req, res) => {
+  const stock = stockList();
+  res.json({
+    ok: true, stock, motifs: MOTIFS,
+    valeur: round(stock.reduce((t, s) => t + s.valeur, 0)),
+    alertes: stock.filter(s => s.alerte).length,
+  });
+});
+
+// ---------- Sorties de stock ----------
+app.get('/api/sorties', (req, res) => {
+  const { du = '', au = '', motif = '' } = req.query;
+  const list = load('sorties')
+    .filter(x => (!du || x.date >= du) && (!au || x.date <= au) && (!motif || x.motif === motif))
+    .sort(byDateDesc);
+  const par_motif = {};
+  for (const x of list) par_motif[x.motif] = round((par_motif[x.motif] || 0) + x.total);
+  res.json({ ok: true, sorties: list, count: list.length, total: round(list.reduce((t, x) => t + x.total, 0)), par_motif });
+});
+
+app.post('/api/sorties', (req, res) => {
+  const date = String(req.body.date || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return fail(res, 'Date invalide');
+  const motif = String(req.body.motif || '');
+  if (!MOTIFS.includes(motif)) return fail(res, 'Choisissez un motif');
+
+  // regroupe les lignes d'un même produit
+  const qtes = {};
+  for (const l of Array.isArray(req.body.lignes) ? req.body.lignes : []) {
+    const q = round(num(l.quantite), 3);
+    if (!(q > 0)) return fail(res, 'Quantité invalide');
+    qtes[+l.produit_id] = round((qtes[+l.produit_id] || 0) + q, 3);
+  }
+  if (!Object.keys(qtes).length) return fail(res, 'Ajoutez au moins un produit');
+
+  const produits = Object.fromEntries(load('produits').map(p => [p.id, p]));
+  const stock = stockMap();
+  const lignes = [];
+  let total = 0;
+  for (const [pid, quantite] of Object.entries(qtes)) {
+    const p = produits[pid];
+    if (!p) return fail(res, 'Produit invalide');
+    const s = stock[pid] || { stock: 0, cmp: p.prix };
+    if (quantite > s.stock + EPS) return fail(res, `Stock insuffisant pour ${p.nom} (reste ${s.stock} ${p.unite})`);
+    const prix = s.cmp || p.prix;
+    const montant = round(quantite * prix);
+    total += montant;
+    lignes.push({ produit_id: +pid, produit: p.nom, categorie: p.categorie, unite: p.unite, quantite, prix, montant });
+  }
+
+  const sorties = load('sorties');
+  sorties.push({
+    id: nextId(sorties), date, motif, lignes, total: round(total),
+    user_id: req.user.id, user: req.user.nom, created_at: now(),
+  });
+  save('sorties', sorties);
+  res.json({ ok: true, message: `Sortie enregistrée (${lignes.length} produit(s))` });
+});
+
+app.delete('/api/sorties/:id', adminOnly, (req, res) => {
+  const sorties = load('sorties');
+  const rest = sorties.filter(x => x.id !== +req.params.id);
+  if (rest.length === sorties.length) return fail(res, 'Sortie introuvable', 404);
+  save('sorties', rest);
+  res.json({ ok: true, message: 'Sortie annulée, produits remis en stock' });
 });
 
 app.get('/api/fournisseurs', (req, res) => {
@@ -286,6 +411,11 @@ app.get('/api/stats', (req, res) => {
     }
   }
   for (const k of ['today', 'week', 'month', 'year']) s[k] = round(s[k]);
+
+  const stock = stockList();
+  s.stock_valeur = round(stock.reduce((t, x) => t + x.valeur, 0));
+  s.alertes = stock.filter(x => x.alerte);
+  s.sorties_month = round(load('sorties').filter(x => x.date.startsWith(month)).reduce((t, x) => t + x.total, 0));
   for (const k in categories) categories[k] = round(categories[k]);
   res.json({
     ok: true, ...s, categories,

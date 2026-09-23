@@ -19,6 +19,8 @@
         <li class="nav-item"><a class="nav-link nav-sec" data-sec="dashboard" href="#dashboard"><i class="bi bi-speedometer2"></i> Tableau de bord</a></li>
         <li class="nav-item"><a class="nav-link nav-sec" data-sec="achat" href="#achat"><i class="bi bi-cart-plus"></i> Nouvel achat</a></li>
         <li class="nav-item"><a class="nav-link nav-sec" data-sec="historique" href="#historique"><i class="bi bi-clock-history"></i> Historique</a></li>
+        <li class="nav-item"><a class="nav-link nav-sec" data-sec="stock" href="#stock"><i class="bi bi-box-seam"></i> Stock <span class="badge bg-danger d-none" id="nav-alertes"></span></a></li>
+        <li class="nav-item"><a class="nav-link nav-sec" data-sec="sortie" href="#sortie"><i class="bi bi-box-arrow-up"></i> Sortie de stock</a></li>
         <li class="nav-item"><a class="nav-link nav-sec" data-sec="produits" href="#produits"><i class="bi bi-apple"></i> Produits</a></li>
         <li class="nav-item admin-only"><a class="nav-link nav-sec" data-sec="users" href="#users"><i class="bi bi-people"></i> Utilisateurs</a></li>
       </ul>
@@ -40,8 +42,12 @@
   <section id="sec-dashboard" class="section d-none">
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h4 class="mb-0">Tableau de bord</h4>
-      <a href="#achat" class="btn btn-success"><i class="bi bi-plus-lg"></i> Nouvel achat</a>
+      <div>
+        <a href="#sortie" class="btn btn-outline-primary"><i class="bi bi-box-arrow-up"></i> Sortie</a>
+        <a href="#achat" class="btn btn-success"><i class="bi bi-plus-lg"></i> Nouvel achat</a>
+      </div>
     </div>
+    <div id="dash-alertes" class="alert alert-warning d-none"></div>
     <div class="row g-3 mb-3">
       <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="card-body">
         <div class="text-muted small">Aujourd'hui</div><div class="fs-4 fw-bold" id="st-today">—</div></div></div></div>
@@ -51,6 +57,10 @@
         <div class="text-muted small">Ce mois <span class="badge bg-light text-dark" id="st-month-nb"></span></div><div class="fs-4 fw-bold" id="st-month">—</div></div></div></div>
       <div class="col-6 col-lg-3"><div class="card stat s4 h-100"><div class="card-body">
         <div class="text-muted small">Cette année</div><div class="fs-4 fw-bold" id="st-year">—</div></div></div></div>
+      <div class="col-6 col-lg-3"><a href="#stock" class="text-decoration-none text-body"><div class="card stat s2 h-100"><div class="card-body">
+        <div class="text-muted small">Valeur du stock</div><div class="fs-4 fw-bold" id="st-stock">—</div></div></div></a></div>
+      <div class="col-6 col-lg-3"><a href="#sortie" class="text-decoration-none text-body"><div class="card stat s3 h-100"><div class="card-body">
+        <div class="text-muted small">Sorties ce mois (valeur)</div><div class="fs-4 fw-bold" id="st-sorties">—</div></div></div></a></div>
     </div>
     <div class="row g-3">
       <div class="col-lg-8"><div class="card h-100">
@@ -174,6 +184,89 @@
     </div>
   </section>
 
+  <!-- ===== Stock ===== -->
+  <section id="sec-stock" class="section d-none">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+      <h4 class="mb-0">Stock actuel</h4>
+      <a href="#sortie" class="btn btn-primary"><i class="bi bi-box-arrow-up"></i> Sortie de stock</a>
+    </div>
+    <div class="row g-3 mb-3">
+      <div class="col-6"><div class="card stat s2"><div class="card-body py-2"><div class="text-muted small">Valeur totale du stock</div><div class="fs-5 fw-bold" id="sk-valeur">—</div></div></div></div>
+      <div class="col-6"><div class="card stat s3"><div class="card-body py-2"><div class="text-muted small">Produits en stock bas</div><div class="fs-5 fw-bold text-danger" id="sk-alertes">—</div></div></div></div>
+    </div>
+    <div class="card">
+      <div class="card-body pb-0">
+        <div class="row g-2 align-items-center">
+          <div class="col-md-5"><input id="sk-search" class="form-control form-control-sm" placeholder="Rechercher…"></div>
+          <div class="col-md-3"><select id="sk-cat" class="form-select form-select-sm"><option value="">Toutes catégories</option><option value="Légume">🥕 Légumes</option><option value="Fruit">🍎 Fruits</option></select></div>
+          <div class="col-md-4"><div class="form-check"><input class="form-check-input" type="checkbox" id="sk-only"><label class="form-check-label small" for="sk-only">Seulement stock bas / épuisé</label></div></div>
+        </div>
+      </div>
+      <div class="table-responsive"><table class="table table-hover align-middle mb-0 mt-2">
+        <thead class="table-light"><tr><th>Produit</th><th class="text-end">Acheté</th><th class="text-end">Sorti</th><th class="text-end">En stock</th><th class="text-end">Seuil</th><th class="text-end">Coût moyen</th><th class="text-end">Valeur</th><th>État</th><th></th></tr></thead>
+        <tbody id="sk-rows"></tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <!-- ===== Sortie de stock ===== -->
+  <section id="sec-sortie" class="section d-none">
+    <h4 class="mb-3">Sortie de stock <small class="text-muted fs-6">— prendre des produits pour la cuisine</small></h4>
+    <div class="row g-3 mb-4">
+      <div class="col-lg-8">
+        <form id="form-sortie" class="card" autocomplete="off">
+          <div class="card-body">
+            <div class="row g-2 mb-3">
+              <div class="col-md-4"><label class="form-label small">Date</label><input type="date" id="s-date" class="form-control" required></div>
+              <div class="col-md-8"><label class="form-label small">Motif / destination</label>
+                <div id="s-motifs" class="btn-group flex-wrap w-100" role="group"></div></div>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle">
+                <thead><tr><th style="min-width:190px">Produit</th><th class="text-end">Disponible</th><th style="width:130px">Quantité</th><th class="text-end">Valeur</th><th></th></tr></thead>
+                <tbody id="s-lines"></tbody>
+              </table>
+            </div>
+            <button type="button" id="btn-s-add" class="btn btn-outline-primary btn-sm"><i class="bi bi-plus-lg"></i> Ajouter une ligne</button>
+          </div>
+          <div class="card-footer bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div><span class="text-muted">Produits :</span> <b id="s-nb">0</b>
+              <span class="text-muted ms-3">Valeur :</span> <span class="fs-5 fw-bold text-primary" id="s-total">0,00 DH</span></div>
+            <div>
+              <button type="button" id="btn-s-reset" class="btn btn-outline-secondary">Vider</button>
+              <button type="submit" class="btn btn-primary"><i class="bi bi-box-arrow-up"></i> Valider la sortie</button>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="col-lg-4">
+        <div class="card">
+          <div class="card-header">Produits en stock <small class="text-muted fw-normal">(cliquez pour prendre)</small></div>
+          <div class="card-body">
+            <input id="s-quick-search" class="form-control form-control-sm mb-2" placeholder="Rechercher…">
+            <div id="s-quick-list" class="d-flex flex-wrap gap-1 quick-box"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+      <h5 class="mb-0">Historique des sorties</h5>
+      <div class="d-flex gap-2 flex-wrap">
+        <input type="date" id="sf-du" class="form-control form-control-sm w-auto">
+        <input type="date" id="sf-au" class="form-control form-control-sm w-auto">
+        <select id="sf-motif" class="form-select form-select-sm w-auto"><option value="">Tous motifs</option></select>
+      </div>
+    </div>
+    <div id="sf-recap" class="d-flex flex-wrap gap-2 mb-2"></div>
+    <div class="card">
+      <div class="table-responsive"><table class="table table-hover mb-0 align-middle">
+        <thead class="table-light"><tr><th>N°</th><th>Date</th><th>Motif</th><th>Produits</th><th class="text-end">Valeur</th><th>Par</th><th></th></tr></thead>
+        <tbody id="sf-rows"></tbody>
+      </table></div>
+    </div>
+  </section>
+
   <!-- ===== Produits ===== -->
   <section id="sec-produits" class="section d-none">
     <div class="d-flex justify-content-between align-items-center mb-3">
@@ -227,7 +320,10 @@
         <select id="mp-cat" class="form-select"><option value="Légume">🥕 Légume</option><option value="Fruit">🍎 Fruit</option></select></div>
       <div class="col-6"><label class="form-label">Unité</label><input id="mp-unite" class="form-control" list="dl-unites" required></div>
     </div>
-    <div class="mt-2"><label class="form-label">Prix de référence (DH)</label><input id="mp-prix" type="number" step="any" min="0" class="form-control" required></div>
+    <div class="row g-2 mt-0">
+      <div class="col-6"><label class="form-label">Prix de référence (DH)</label><input id="mp-prix" type="number" step="any" min="0" class="form-control" required></div>
+      <div class="col-6"><label class="form-label">Seuil d'alerte stock</label><input id="mp-min" type="number" step="any" min="0" class="form-control" placeholder="0 = pas d'alerte"></div>
+    </div>
     <datalist id="dl-unites"><option value="kg"><option value="g"><option value="pièce"><option value="botte"><option value="caisse"><option value="sac"><option value="douzaine"><option value="litre"></datalist>
   </div>
   <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button><button class="btn btn-success">Enregistrer</button></div>

@@ -56,7 +56,10 @@ function confirmBox(msg) {
 }
 
 // ---------- Navigation ----------
-const loaders = { dashboard: loadDashboard, achat: initAchat, historique: loadHistorique, produits: loadProduits, users: loadUsers };
+const loaders = {
+  dashboard: loadDashboard, achat: initAchat, historique: loadHistorique,
+  stock: loadStock, sortie: initSortie, produits: loadProduits, users: loadUsers,
+};
 
 function route() {
   let sec = location.hash.slice(1) || 'dashboard';
@@ -105,6 +108,13 @@ function loadDashboard() {
     $('#st-month').text(money(s.month));
     $('#st-month-nb').text(s.nb_month + ' achat(s)');
     $('#st-year').text(money(s.year));
+    $('#st-stock').text(money(s.stock_valeur));
+    $('#st-sorties').text(money(s.sorties_month));
+    setAlertBadge(s.alertes.length);
+    $('#dash-alertes').toggleClass('d-none', !s.alertes.length).html(
+      `<i class="bi bi-exclamation-triangle-fill"></i> <b>Stock bas :</b> ` +
+      s.alertes.map(a => `${esc(a.nom)} (${qty(a.stock)} ${esc(a.unite)})`).join(', ') +
+      ` — <a href="#stock" class="alert-link">voir le stock</a>`);
 
     const labels = s.mois.map(m => {
       const [y, mo] = m.mois.split('-');
@@ -425,6 +435,244 @@ $('#btn-csv').on('click', () => {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 
+// ---------- Stock ----------
+let STOCK = [];
+let MOTIFS = [];
+const stk = id => STOCK.find(s => s.id == id);
+const setAlertBadge = n => $('#nav-alertes').text(n).toggleClass('d-none', !n);
+
+function fetchStock() {
+  return api('GET', 'stock').then(r => {
+    STOCK = r.stock;
+    MOTIFS = r.motifs;
+    setAlertBadge(r.alertes);
+    return r;
+  });
+}
+
+function loadStock() {
+  fetchStock().then(r => {
+    $('#sk-valeur').text(money(r.valeur));
+    $('#sk-alertes').text(r.alertes);
+    renderStock();
+  });
+}
+
+function stockState(s) {
+  if (s.stock <= 0) return '<span class="badge bg-danger">Épuisé</span>';
+  if (s.alerte) return '<span class="badge bg-warning text-dark">Stock bas</span>';
+  return '<span class="badge bg-success">OK</span>';
+}
+
+function renderStock() {
+  const q = ($('#sk-search').val() || '').toLowerCase();
+  const c = $('#sk-cat').val();
+  const only = $('#sk-only').is(':checked');
+  const list = STOCK.filter(s => (!c || s.categorie === c) && s.nom.toLowerCase().includes(q) && (!only || s.alerte || s.stock <= 0));
+  $('#sk-rows').html(list.length ? list.map(s => `<tr class="${s.stock <= 0 ? 'text-muted' : ''}">
+    <td class="fw-semibold">${s.categorie === 'Fruit' ? '🍎' : '🥕'} ${esc(s.nom)}</td>
+    <td class="text-end">${qty(s.achete)}</td>
+    <td class="text-end">${qty(s.sorti)}</td>
+    <td class="text-end fw-bold ${s.alerte || s.stock <= 0 ? 'text-danger' : ''}">${qty(s.stock)} ${esc(s.unite)}</td>
+    <td class="text-end small">${s.stock_min ? qty(s.stock_min) : '—'}</td>
+    <td class="text-end small">${money(s.cmp)}</td>
+    <td class="text-end">${money(s.valeur)}</td>
+    <td>${stockState(s)}</td>
+    <td class="text-end">${s.stock > 0 ? `<button class="btn btn-sm btn-outline-primary sk-take" data-id="${s.id}"><i class="bi bi-box-arrow-up"></i> Prendre</button>` : ''}</td>
+  </tr>`).join('') : emptyRow(9, 'Aucun produit'));
+}
+$('#sk-search').on('input', renderStock);
+$('#sk-cat, #sk-only').on('change', renderStock);
+$('#sk-rows').on('click', '.sk-take', function () { pendingTake = $(this).data('id'); location.hash = 'sortie'; });
+
+// ---------- Sortie de stock ----------
+let sortieReady = false;
+let pendingTake = null;
+
+function defaultMotif() {
+  const h = new Date().getHours();
+  return h < 10 ? 'Petit-déjeuner' : h < 16 ? 'Déjeuner' : 'Dîner';
+}
+
+function initSortie() {
+  fetchStock().then(() => {
+    if (!$('#s-motifs').children().length) {
+      $('#s-motifs').html(MOTIFS.map((m, i) => `
+        <input type="radio" class="btn-check" name="s-motif" id="sm-${i}" value="${esc(m)}">
+        <label class="btn btn-outline-primary btn-sm" for="sm-${i}">${esc(m)}</label>`).join(''));
+      $('#sf-motif').append(MOTIFS.map(m => `<option>${esc(m)}</option>`).join(''));
+      const [du, au] = periodDates('month');
+      $('#sf-du').val(du);
+      $('#sf-au').val(au);
+    }
+    if (!sortieReady) { resetSortie(); sortieReady = true; }
+    $('#s-lines .s-prod').each(function () {
+      const v = $(this).val();
+      $(this).html('<option value="">— Choisir —</option>' + stockOptions(v));
+    });
+    recalcS();
+    renderSQuick();
+    if (pendingTake) { takeProduct(pendingTake); pendingTake = null; }
+    loadSorties();
+  });
+}
+
+function stockOptions(selected) {
+  const groups = { 'Légume': [], 'Fruit': [] };
+  STOCK.forEach(s => (groups[s.categorie] ||= []).push(s));
+  return Object.entries(groups).filter(([, ss]) => ss.length).map(([g, ss]) =>
+    `<optgroup label="${g === 'Fruit' ? '🍎 Fruits' : '🥕 Légumes'}">` +
+    ss.map(s => `<option value="${s.id}" ${s.id == selected ? 'selected' : ''} ${s.stock <= 0 && s.id != selected ? 'disabled' : ''}>
+      ${esc(s.nom)} (${qty(s.stock)} ${esc(s.unite)})</option>`).join('') +
+    '</optgroup>').join('');
+}
+
+function addSLine() {
+  const $tr = $(`<tr>
+    <td><select class="form-select form-select-sm s-prod"><option value="">— Choisir —</option>${stockOptions()}</select></td>
+    <td class="text-end small text-muted s-dispo"></td>
+    <td><input type="number" step="any" min="0" class="form-control form-control-sm s-qte"></td>
+    <td class="text-end fw-semibold s-val text-nowrap">0,00</td>
+    <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger s-del" title="Retirer"><i class="bi bi-x-lg"></i></button></td>
+  </tr>`);
+  $('#s-lines').append($tr);
+  return $tr;
+}
+
+function recalcS() {
+  let total = 0, nb = 0;
+  $('#s-lines tr').each(function () {
+    const s = stk($(this).find('.s-prod').val());
+    const q = parseFloat($(this).find('.s-qte').val()) || 0;
+    $(this).find('.s-dispo').text(s ? `${qty(s.stock)} ${s.unite}` : '');
+    $(this).find('.s-qte').toggleClass('is-invalid', !!s && q > s.stock);
+    const v = s ? Math.round(q * s.cmp * 100) / 100 : 0;
+    $(this).find('.s-val').text(fmt(v));
+    total += v;
+    if (s) nb++;
+  });
+  $('#s-total').text(money(total));
+  $('#s-nb').text(nb);
+}
+
+function resetSortie() {
+  $('#s-date').val(ymd(new Date()));
+  $(`#s-motifs input[value="${defaultMotif()}"]`).prop('checked', true);
+  $('#s-lines').empty();
+  addSLine();
+  recalcS();
+}
+
+function takeProduct(id) {
+  id = String(id);
+  const $exist = $('#s-lines tr').filter((i, tr) => $(tr).find('.s-prod').val() === id).first();
+  if ($exist.length) return $exist.find('.s-qte').trigger('focus').trigger('select');
+  let $tr = $('#s-lines tr').filter((i, tr) => !$(tr).find('.s-prod').val()).first();
+  if (!$tr.length) $tr = addSLine();
+  $tr.find('.s-prod').val(id);
+  recalcS();
+  $tr.find('.s-qte').trigger('focus');
+}
+
+function renderSQuick() {
+  const q = ($('#s-quick-search').val() || '').toLowerCase();
+  const list = STOCK.filter(s => s.stock > 0 && s.nom.toLowerCase().includes(q));
+  $('#s-quick-list').html(list.length ? list.map(s => `
+    <button type="button" class="btn btn-sm ${s.alerte ? 'btn-outline-danger' : 'btn-outline-primary'} s-quick" data-id="${s.id}">
+      ${esc(s.nom)} <small class="opacity-75">${qty(s.stock)} ${esc(s.unite)}</small></button>`).join('')
+    : '<span class="text-muted small">Aucun produit en stock. Enregistrez d\'abord un achat.</span>');
+}
+$('#s-quick-search').on('input', renderSQuick);
+$('#s-quick-list').on('click', '.s-quick', function () { takeProduct($(this).data('id')); });
+
+$('#s-lines')
+  .on('change', '.s-prod', function () { recalcS(); $(this).closest('tr').find('.s-qte').trigger('focus'); })
+  .on('input', '.s-qte', recalcS)
+  .on('click', '.s-del', function () {
+    $(this).closest('tr').remove();
+    if (!$('#s-lines tr').length) addSLine();
+    recalcS();
+  })
+  .on('keydown', '.s-qte', function (e) {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const $tr = $(this).closest('tr');
+    ($tr.is(':last-child') ? addSLine() : $tr.next()).find('.s-prod').trigger('focus');
+  });
+$('#form-sortie').on('keydown', 'input', e => { if (e.key === 'Enter') e.preventDefault(); });
+$('#btn-s-add').on('click', () => addSLine().find('.s-prod').trigger('focus'));
+$('#btn-s-reset').on('click', resetSortie);
+
+$('#form-sortie').on('submit', function (e) {
+  e.preventDefault();
+  const lignes = [];
+  let err = null;
+  $('#s-lines tr').each(function () {
+    const s = stk($(this).find('.s-prod').val());
+    const q = $(this).find('.s-qte').val();
+    if (!s && !q) return;
+    if (!s) err = err || 'Choisissez un produit pour chaque ligne';
+    else if (!(parseFloat(q) > 0)) err = err || 'Quantité manquante pour ' + s.nom;
+    else if (parseFloat(q) > s.stock) err = err || `Stock insuffisant pour ${s.nom} (reste ${qty(s.stock)} ${s.unite})`;
+    if (s) lignes.push({ produit_id: s.id, quantite: q });
+  });
+  const motif = $('#s-motifs input:checked').val();
+  if (err) return toast(err, 'warning');
+  if (!lignes.length) return toast('Ajoutez au moins un produit', 'warning');
+  if (!motif) return toast('Choisissez un motif', 'warning');
+
+  const $btn = $(this).find('[type=submit]').prop('disabled', true);
+  api('POST', 'sorties', { date: $('#s-date').val(), motif, lignes })
+    .then(r => { toast(r.message); sortieReady = false; initSortie(); })
+    .always(() => $btn.prop('disabled', false));
+});
+
+// Historique des sorties
+const SCACHE = {};
+function loadSorties() {
+  api('GET', 'sorties', { du: $('#sf-du').val(), au: $('#sf-au').val(), motif: $('#sf-motif').val() }).then(r => {
+    r.sorties.forEach(x => { SCACHE[x.id] = x; });
+    $('#sf-recap').html(
+      `<span class="badge bg-primary fs-6">${r.count} sortie(s) — ${money(r.total)}</span>` +
+      Object.entries(r.par_motif).map(([m, t]) => `<span class="badge bg-light text-dark border">${esc(m)} : ${money(t)}</span>`).join(''));
+    $('#sf-rows').html(r.sorties.length ? r.sorties.map(x => `<tr class="clickable" data-id="${x.id}">
+      <td class="text-muted">#${x.id}</td>
+      <td class="text-nowrap">${frDate(x.date)}</td>
+      <td><span class="badge bg-info text-dark">${esc(x.motif)}</span></td>
+      <td class="small">${x.lignes.map(l => `${esc(l.produit)} ${qty(l.quantite)} ${esc(l.unite)}`).join(', ')}</td>
+      <td class="text-end fw-semibold text-nowrap">${money(x.total)}</td>
+      <td class="small text-muted">${esc(x.user)}</td>
+      <td class="text-end">${isAdmin() ? '<button class="btn btn-sm btn-outline-danger sf-del" title="Annuler la sortie"><i class="bi bi-trash"></i></button>' : ''}</td>
+    </tr>`).join('') : emptyRow(7, 'Aucune sortie sur cette période'));
+  });
+}
+$('#sf-du, #sf-au, #sf-motif').on('change', loadSorties);
+$('#sf-rows').on('click', 'tr[data-id]', function (e) {
+  const x = SCACHE[$(this).data('id')];
+  if ($(e.target).closest('.sf-del').length) {
+    return confirmBox(`Annuler la sortie N° ${x.id} ? Les produits seront remis en stock.`).then(() =>
+      api('DELETE', 'sorties/' + x.id).then(r => { toast(r.message); initSortie(); }));
+  }
+  showSortie(x);
+});
+
+function showSortie(x) {
+  $('#d-title').text(`Sortie N° ${x.id} — ${frDate(x.date)}`);
+  $('#d-body').html(`
+    <div class="row small mb-3">
+      <div class="col-sm-6"><b>Motif :</b> ${esc(x.motif)}</div>
+      <div class="col-sm-6"><b>Par :</b> ${esc(x.user)} le ${esc(x.created_at)}</div>
+    </div>
+    <table class="table table-sm">
+      <thead><tr><th>Produit</th><th class="text-end">Quantité</th><th class="text-end">Coût moyen</th><th class="text-end">Valeur</th></tr></thead>
+      <tbody>${x.lignes.map(l => `<tr><td>${esc(l.produit)}</td><td class="text-end">${qty(l.quantite)} ${esc(l.unite)}</td>
+        <td class="text-end">${money(l.prix)}</td><td class="text-end">${money(l.montant)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><th colspan="3" class="text-end">Total</th><th class="text-end text-primary">${money(x.total)}</th></tr></tfoot>
+    </table>`);
+  $('#d-edit').addClass('d-none');
+  modal('m-detail').show();
+}
+
 // ---------- Gestion des produits ----------
 function loadProduits() { fetchProduits().then(renderProduits); }
 
@@ -454,6 +702,7 @@ function openProduit(p = {}) {
   $('#mp-cat').val(p.categorie || 'Légume');
   $('#mp-unite').val(p.unite || 'kg');
   $('#mp-prix').val(p.prix ?? '');
+  $('#mp-min').val(p.stock_min || '');
   modal('m-produit').show();
 }
 $('#btn-p-add').on('click', () => openProduit());
@@ -468,7 +717,7 @@ $('#form-produit').on('submit', function (e) {
   e.preventDefault();
   api('POST', 'produits', {
     id: +$('#mp-id').val() || 0, nom: $('#mp-nom').val(), categorie: $('#mp-cat').val(),
-    unite: $('#mp-unite').val(), prix: $('#mp-prix').val(),
+    unite: $('#mp-unite').val(), prix: $('#mp-prix').val(), stock_min: $('#mp-min').val(),
   }).then(r => { toast(r.message); modal('m-produit').hide(); loadProduits(); });
 });
 

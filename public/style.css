@@ -13,7 +13,8 @@ body { background: #f4f6f3; }
 
 tr.clickable { cursor: pointer; }
 #lines input, #lines select { min-width: 80px; }
-#quick-list { max-height: 420px; overflow-y: auto; }
+#quick-list, .quick-box { max-height: 420px; overflow-y: auto; }
+#s-lines input, #s-lines select { min-width: 80px; }
 
 .navbar .nav-link.active { font-weight: 600; background: rgba(255, 255, 255, .15); border-radius: .375rem; }
 
