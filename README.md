@@ -27,5 +27,6 @@ mais les données seront **effacées** à chaque redémarrage / mise en veille.
 |---|---|
 | `SESSION_SECRET` | Clé de signature des sessions (générée par Render) |
 | `ADMIN_PASSWORD` | Mot de passe initial de `admin` (seulement à la 1re création) |
+| `USER_PASSWORD` | Mot de passe initial de `cuisine` (rôle utilisateur) |
 | `DATA_DIR` | Dossier des fichiers JSON (défaut : `./data`) |
 | `TZ` | Fuseau horaire (défaut : `Africa/Casablanca`) |

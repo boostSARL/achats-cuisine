@@ -12,6 +12,8 @@ services:
         generateValue: true
       - key: ADMIN_PASSWORD   # mot de passe initial du compte "admin"
         sync: false
+      - key: USER_PASSWORD    # mot de passe initial du compte "cuisine"
+        sync: false
       - key: TZ
         value: Africa/Casablanca
     # Pour garder les données, passer au plan "starter" et ajouter :

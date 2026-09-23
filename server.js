@@ -37,6 +37,9 @@ function initData() {
     save('users', [{
       id: 1, username: 'admin', nom: 'Administrateur', role: 'admin',
       password: bcrypt.hashSync(process.env.ADMIN_PASSWORD || 'admin123', 10),
+    }, {
+      id: 2, username: 'cuisine', nom: 'Cuisine', role: 'user',
+      password: bcrypt.hashSync(process.env.USER_PASSWORD || 'cuisine123', 10),
     }]);
   }
   if (!fs.existsSync(path.join(DATA_DIR, 'produits.json'))) {
