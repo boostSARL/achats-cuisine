@@ -1,0 +1,24 @@
+body { background: #f4f6f3; }
+.login-bg { background: linear-gradient(135deg, #198754 0%, #6fbf73 60%, #ffc107 140%); }
+
+.card { border: 0; box-shadow: 0 1px 3px rgba(0, 0, 0, .08); }
+.card-header { background: #fff; font-weight: 600; }
+
+.stat { border-left: 4px solid #198754; }
+.stat.s2 { border-left-color: #0d6efd; }
+.stat.s3 { border-left-color: #ffc107; }
+.stat.s4 { border-left-color: #6f42c1; }
+
+.chart-box { position: relative; height: 280px; }
+
+tr.clickable { cursor: pointer; }
+#lines input, #lines select { min-width: 80px; }
+#quick-list { max-height: 420px; overflow-y: auto; }
+
+.navbar .nav-link.active { font-weight: 600; background: rgba(255, 255, 255, .15); border-radius: .375rem; }
+
+@media print {
+  .no-print, .navbar, .btn, #toasts { display: none !important; }
+  body { background: #fff; }
+  .card { box-shadow: none; border: 1px solid #ddd; }
+}

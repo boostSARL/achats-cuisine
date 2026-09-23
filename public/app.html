@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Achats Cuisine</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="/style.css" rel="stylesheet">
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-success sticky-top">
+  <div class="container-fluid">
+    <a class="navbar-brand fw-bold" href="#dashboard"><i class="bi bi-basket2-fill"></i> Achats Cuisine</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav"><span class="navbar-toggler-icon"></span></button>
+    <div class="collapse navbar-collapse" id="nav">
+      <ul class="navbar-nav me-auto gap-1">
+        <li class="nav-item"><a class="nav-link nav-sec" data-sec="dashboard" href="#dashboard"><i class="bi bi-speedometer2"></i> Tableau de bord</a></li>
+        <li class="nav-item"><a class="nav-link nav-sec" data-sec="achat" href="#achat"><i class="bi bi-cart-plus"></i> Nouvel achat</a></li>
+        <li class="nav-item"><a class="nav-link nav-sec" data-sec="historique" href="#historique"><i class="bi bi-clock-history"></i> Historique</a></li>
+        <li class="nav-item"><a class="nav-link nav-sec" data-sec="produits" href="#produits"><i class="bi bi-apple"></i> Produits</a></li>
+        <li class="nav-item admin-only"><a class="nav-link nav-sec" data-sec="users" href="#users"><i class="bi bi-people"></i> Utilisateurs</a></li>
+      </ul>
+      <div class="dropdown">
+        <button class="btn btn-outline-light btn-sm dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-person-circle"></i> <span id="me-nom"></span></button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><a class="dropdown-item" href="#" id="btn-pwd"><i class="bi bi-key"></i> Changer mot de passe</a></li>
+          <li><hr class="dropdown-divider"></li>
+          <li><a class="dropdown-item text-danger" href="#" id="btn-logout"><i class="bi bi-box-arrow-right"></i> Déconnexion</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<main class="container-fluid py-3">
+
+  <!-- ===== Tableau de bord ===== -->
+  <section id="sec-dashboard" class="section d-none">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="mb-0">Tableau de bord</h4>
+      <a href="#achat" class="btn btn-success"><i class="bi bi-plus-lg"></i> Nouvel achat</a>
+    </div>
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-lg-3"><div class="card stat h-100"><div class="card-body">
+        <div class="text-muted small">Aujourd'hui</div><div class="fs-4 fw-bold" id="st-today">—</div></div></div></div>
+      <div class="col-6 col-lg-3"><div class="card stat s2 h-100"><div class="card-body">
+        <div class="text-muted small">Cette semaine</div><div class="fs-4 fw-bold" id="st-week">—</div></div></div></div>
+      <div class="col-6 col-lg-3"><div class="card stat s3 h-100"><div class="card-body">
+        <div class="text-muted small">Ce mois <span class="badge bg-light text-dark" id="st-month-nb"></span></div><div class="fs-4 fw-bold" id="st-month">—</div></div></div></div>
+      <div class="col-6 col-lg-3"><div class="card stat s4 h-100"><div class="card-body">
+        <div class="text-muted small">Cette année</div><div class="fs-4 fw-bold" id="st-year">—</div></div></div></div>
+    </div>
+    <div class="row g-3">
+      <div class="col-lg-8"><div class="card h-100">
+        <div class="card-header">Dépenses des 12 derniers mois</div>
+        <div class="card-body"><div class="chart-box"><canvas id="ch-mois"></canvas></div></div>
+      </div></div>
+      <div class="col-lg-4"><div class="card h-100">
+        <div class="card-header">Légumes vs Fruits (ce mois)</div>
+        <div class="card-body"><div class="chart-box"><canvas id="ch-cat"></canvas></div></div>
+      </div></div>
+      <div class="col-lg-6"><div class="card h-100">
+        <div class="card-header">Top produits du mois</div>
+        <div class="table-responsive"><table class="table table-sm mb-0">
+          <thead><tr><th>Produit</th><th class="text-end">Quantité</th><th class="text-end">Montant</th></tr></thead>
+          <tbody id="top-rows"></tbody>
+        </table></div>
+      </div></div>
+      <div class="col-lg-6"><div class="card h-100">
+        <div class="card-header d-flex justify-content-between">Derniers achats <a href="#historique" class="small">Tout voir</a></div>
+        <div class="table-responsive"><table class="table table-sm table-hover mb-0">
+          <thead><tr><th>Date</th><th>Fournisseur</th><th class="text-end">Total</th></tr></thead>
+          <tbody id="recent-rows"></tbody>
+        </table></div>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- ===== Nouvel achat ===== -->
+  <section id="sec-achat" class="section d-none">
+    <h4 id="achat-title" class="mb-3">Nouvel achat</h4>
+    <div class="row g-3">
+      <div class="col-lg-8">
+        <form id="form-achat" class="card" autocomplete="off">
+          <div class="card-body">
+            <input type="hidden" id="a-id">
+            <div class="row g-2 mb-3">
+              <div class="col-md-3"><label class="form-label small">Date</label><input type="date" id="a-date" class="form-control" required></div>
+              <div class="col-md-4"><label class="form-label small">Fournisseur</label><input id="a-four" class="form-control" list="dl-four" placeholder="Ex : Marché de gros"></div>
+              <div class="col-md-5"><label class="form-label small">Note</label><input id="a-note" class="form-control" placeholder="Optionnel"></div>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle">
+                <thead><tr><th style="min-width:170px">Produit</th><th>Unité</th><th style="width:120px">Quantité</th><th style="width:130px">Prix unit.</th><th class="text-end">Montant</th><th></th></tr></thead>
+                <tbody id="lines"></tbody>
+              </table>
+            </div>
+            <button type="button" id="btn-add-line" class="btn btn-outline-success btn-sm"><i class="bi bi-plus-lg"></i> Ajouter une ligne</button>
+            <span class="text-muted small ms-2 d-none d-md-inline">Astuce : <kbd>Entrée</kbd> passe au champ suivant et ajoute une ligne.</span>
+          </div>
+          <div class="card-footer bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div><span class="text-muted">Articles :</span> <b id="a-nb">0</b>
+              <span class="text-muted ms-3">Total :</span> <span class="fs-4 fw-bold text-success" id="a-total">0,00 DH</span></div>
+            <div>
+              <button type="button" id="btn-cancel-edit" class="btn btn-outline-secondary d-none">Annuler</button>
+              <button type="button" id="btn-reset" class="btn btn-outline-secondary">Vider</button>
+              <button type="submit" class="btn btn-success"><i class="bi bi-check2-circle"></i> Enregistrer</button>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="col-lg-4">
+        <div class="card">
+          <div class="card-header">Ajout rapide <small class="text-muted fw-normal">(cliquez un produit)</small></div>
+          <div class="card-body">
+            <input id="quick-search" class="form-control form-control-sm mb-2" placeholder="Rechercher un produit…">
+            <div id="quick-list" class="d-flex flex-wrap gap-1"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <datalist id="dl-four"></datalist>
+  </section>
+
+  <!-- ===== Historique ===== -->
+  <section id="sec-historique" class="section d-none">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+      <h4 class="mb-0">Historique des achats</h4>
+      <div>
+        <button id="btn-csv" class="btn btn-outline-success btn-sm"><i class="bi bi-filetype-csv"></i> Export Excel (CSV)</button>
+        <button id="btn-print" class="btn btn-outline-secondary btn-sm"><i class="bi bi-printer"></i> Imprimer</button>
+      </div>
+    </div>
+    <form id="form-filtre" class="card card-body mb-3 no-print">
+      <div class="row g-2 align-items-end">
+        <div class="col-6 col-md-2"><label class="form-label small">Du</label><input type="date" id="f-du" class="form-control form-control-sm"></div>
+        <div class="col-6 col-md-2"><label class="form-label small">Au</label><input type="date" id="f-au" class="form-control form-control-sm"></div>
+        <div class="col-6 col-md-2"><label class="form-label small">Fournisseur</label><input id="f-four" class="form-control form-control-sm" list="dl-four"></div>
+        <div class="col-6 col-md-2"><label class="form-label small">Catégorie</label>
+          <select id="f-cat" class="form-select form-select-sm"><option value="">Toutes</option><option value="Légume">🥕 Légumes</option><option value="Fruit">🍎 Fruits</option></select></div>
+        <div class="col-6 col-md-2"><label class="form-label small">Produit</label><select id="f-produit" class="form-select form-select-sm"></select></div>
+        <div class="col-6 col-md-2"><label class="form-label small">Recherche</label><input id="f-q" class="form-control form-control-sm" placeholder="Mot clé…"></div>
+      </div>
+      <div class="mt-2 d-flex flex-wrap gap-1 align-items-center">
+        <span class="small text-muted me-1">Période :</span>
+        <button type="button" class="btn btn-sm btn-light period" data-p="today">Aujourd'hui</button>
+        <button type="button" class="btn btn-sm btn-light period" data-p="week">Cette semaine</button>
+        <button type="button" class="btn btn-sm btn-light period" data-p="month">Ce mois</button>
+        <button type="button" class="btn btn-sm btn-light period" data-p="lastmonth">Mois dernier</button>
+        <button type="button" class="btn btn-sm btn-light period" data-p="year">Cette année</button>
+        <button type="button" class="btn btn-sm btn-light period" data-p="all">Tout</button>
+        <button type="button" id="btn-f-reset" class="btn btn-sm btn-outline-secondary ms-auto"><i class="bi bi-x-circle"></i> Réinitialiser</button>
+      </div>
+    </form>
+    <div class="row g-3 mb-3">
+      <div class="col-4"><div class="card stat s2"><div class="card-body py-2"><div class="text-muted small">Nombre d'achats</div><div class="fs-5 fw-bold" id="h-count">0</div></div></div></div>
+      <div class="col-4"><div class="card stat"><div class="card-body py-2"><div class="text-muted small" id="h-total-label">Montant total</div><div class="fs-5 fw-bold text-success" id="h-total">0</div></div></div></div>
+      <div class="col-4"><div class="card stat s3"><div class="card-body py-2"><div class="text-muted small">Moyenne par achat</div><div class="fs-5 fw-bold" id="h-avg">0</div></div></div></div>
+    </div>
+    <div class="card mb-3">
+      <div class="table-responsive"><table class="table table-hover mb-0 align-middle">
+        <thead class="table-light"><tr><th>N°</th><th>Date</th><th>Fournisseur</th><th>Articles</th><th class="text-end">Total</th><th>Saisi par</th><th class="no-print"></th></tr></thead>
+        <tbody id="h-rows"></tbody>
+      </table></div>
+    </div>
+    <div class="card">
+      <div class="card-header">Récapitulatif par produit</div>
+      <div class="table-responsive"><table class="table table-sm mb-0">
+        <thead><tr><th>Produit</th><th>Catégorie</th><th class="text-end">Quantité totale</th><th class="text-end">Prix moyen</th><th class="text-end">Min / Max</th><th class="text-end">Montant</th></tr></thead>
+        <tbody id="h-recap"></tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <!-- ===== Produits ===== -->
+  <section id="sec-produits" class="section d-none">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="mb-0">Produits <span class="badge bg-secondary fs-6" id="p-count"></span></h4>
+      <button id="btn-p-add" class="btn btn-success admin-only"><i class="bi bi-plus-lg"></i> Nouveau produit</button>
+    </div>
+    <div class="card">
+      <div class="card-body pb-0">
+        <div class="row g-2">
+          <div class="col-md-6"><input id="p-search" class="form-control form-control-sm" placeholder="Rechercher…"></div>
+          <div class="col-md-3"><select id="p-cat" class="form-select form-select-sm"><option value="">Toutes catégories</option><option value="Légume">🥕 Légumes</option><option value="Fruit">🍎 Fruits</option></select></div>
+        </div>
+      </div>
+      <div class="table-responsive"><table class="table table-hover align-middle mb-0 mt-2">
+        <thead class="table-light"><tr><th>Nom</th><th>Catégorie</th><th>Unité</th><th class="text-end">Prix de référence</th><th class="text-end">Dernier prix payé</th><th class="admin-only"></th></tr></thead>
+        <tbody id="p-rows"></tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <!-- ===== Utilisateurs ===== -->
+  <section id="sec-users" class="section d-none admin-only">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="mb-0">Utilisateurs</h4>
+      <button id="btn-u-add" class="btn btn-success"><i class="bi bi-person-plus"></i> Nouvel utilisateur</button>
+    </div>
+    <div class="card"><div class="table-responsive"><table class="table table-hover align-middle mb-0">
+      <thead class="table-light"><tr><th>Identifiant</th><th>Nom</th><th>Rôle</th><th></th></tr></thead>
+      <tbody id="u-rows"></tbody>
+    </table></div></div>
+  </section>
+</main>
+
+<!-- ===== Modales ===== -->
+<div class="modal fade" id="m-detail" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title" id="d-title"></h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body" id="d-body"></div>
+  <div class="modal-footer">
+    <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Fermer</button>
+    <button class="btn btn-primary" id="d-edit"><i class="bi bi-pencil"></i> Modifier</button>
+  </div>
+</div></div></div>
+
+<div class="modal fade" id="m-produit" tabindex="-1"><div class="modal-dialog"><form class="modal-content" id="form-produit">
+  <div class="modal-header"><h5 class="modal-title" id="mp-title">Produit</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body">
+    <input type="hidden" id="mp-id">
+    <div class="mb-2"><label class="form-label">Nom</label><input id="mp-nom" class="form-control" required></div>
+    <div class="row g-2">
+      <div class="col-6"><label class="form-label">Catégorie</label>
+        <select id="mp-cat" class="form-select"><option value="Légume">🥕 Légume</option><option value="Fruit">🍎 Fruit</option></select></div>
+      <div class="col-6"><label class="form-label">Unité</label><input id="mp-unite" class="form-control" list="dl-unites" required></div>
+    </div>
+    <div class="mt-2"><label class="form-label">Prix de référence (DH)</label><input id="mp-prix" type="number" step="any" min="0" class="form-control" required></div>
+    <datalist id="dl-unites"><option value="kg"><option value="g"><option value="pièce"><option value="botte"><option value="caisse"><option value="sac"><option value="douzaine"><option value="litre"></datalist>
+  </div>
+  <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button><button class="btn btn-success">Enregistrer</button></div>
+</form></div></div>
+
+<div class="modal fade" id="m-user" tabindex="-1"><div class="modal-dialog"><form class="modal-content" id="form-user" autocomplete="off">
+  <div class="modal-header"><h5 class="modal-title" id="mu-title">Utilisateur</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body">
+    <input type="hidden" id="mu-id">
+    <div class="mb-2"><label class="form-label">Identifiant</label><input id="mu-username" class="form-control" required></div>
+    <div class="mb-2"><label class="form-label">Nom complet</label><input id="mu-nom" class="form-control"></div>
+    <div class="mb-2"><label class="form-label">Rôle</label>
+      <select id="mu-role" class="form-select"><option value="user">Utilisateur (saisie des achats)</option><option value="admin">Administrateur</option></select></div>
+    <div><label class="form-label">Mot de passe</label><input id="mu-password" type="password" class="form-control" autocomplete="new-password"></div>
+  </div>
+  <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button><button class="btn btn-success">Enregistrer</button></div>
+</form></div></div>
+
+<div class="modal fade" id="m-pwd" tabindex="-1"><div class="modal-dialog modal-sm"><form class="modal-content" id="form-pwd">
+  <div class="modal-header"><h5 class="modal-title">Changer le mot de passe</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body">
+    <div class="mb-2"><label class="form-label">Ancien</label><input id="pw-old" type="password" class="form-control" required autocomplete="current-password"></div>
+    <div class="mb-2"><label class="form-label">Nouveau</label><input id="pw-new" type="password" class="form-control" required autocomplete="new-password"></div>
+    <div><label class="form-label">Confirmation</label><input id="pw-new2" type="password" class="form-control" required autocomplete="new-password"></div>
+  </div>
+  <div class="modal-footer"><button class="btn btn-success w-100">Valider</button></div>
+</form></div></div>
+
+<div class="modal fade" id="m-confirm" tabindex="-1"><div class="modal-dialog modal-sm modal-dialog-centered"><div class="modal-content">
+  <div class="modal-body text-center py-4"><i class="bi bi-exclamation-triangle text-danger fs-1"></i><p class="mt-2 mb-0" id="confirm-msg"></p></div>
+  <div class="modal-footer justify-content-center">
+    <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+    <button class="btn btn-danger" id="btn-confirm-ok">Supprimer</button>
+  </div>
+</div></div></div>
+
+<div id="toasts" class="toast-container position-fixed bottom-0 end-0 p-3"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

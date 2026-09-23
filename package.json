@@ -1,0 +1,17 @@
+{
+  "name": "achats-cuisine",
+  "version": "1.0.0",
+  "description": "Gestion des achats de légumes et fruits pour la cuisine",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cookie-session": "^2.1.0",
+    "express": "^4.21.2"
+  }
+}

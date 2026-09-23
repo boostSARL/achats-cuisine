@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: achats-cuisine
+    runtime: node
+    plan: starter            # un disque persistant nécessite un plan payant
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ADMIN_PASSWORD   # mot de passe initial du compte "admin"
+        sync: false
+      - key: DATA_DIR
+        value: /var/data
+      - key: TZ
+        value: Africa/Casablanca
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 1
